@@ -30,7 +30,7 @@ const ImageZone = ({ label, imageUrl, imageName, onFileChange, onRemoveImage }: 
             <img
               src={imageUrl}
               alt="Uploaded"
-              style={{ width: "100%", height: "200px", objectFit: "cover", marginBottom: "16px", borderRadius: '8px' }}
+              style={{ width: "200px", height: "200px", objectFit: "cover", marginBottom: "16px", borderRadius: '8px' }}
             />
             <IconButton
               color="error"

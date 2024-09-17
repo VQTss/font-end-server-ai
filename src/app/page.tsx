@@ -1,6 +1,6 @@
-"use client"
+"use client";
 import { useState } from "react";
-import { Box, Button, Grid, Typography } from "@mui/material";
+import { Box, Button, Grid, Typography, Snackbar, Alert, CircularProgress } from "@mui/material";
 import ImageZone from "../components/MainImageZone";
 import DisplayResults from "../components/DisplayResults";
 import { useImageUpload } from "../hooks/useImageUpload";
@@ -9,21 +9,40 @@ import { submitImages } from "../services/imageService";
 export default function HomePage() {
   const { osImageData, odImageData, handleImageUpload, removeImage } = useImageUpload();
   const [resultData, setResultData] = useState<any>(null); // Store the result data
+  const [snackbarOpen, setSnackbarOpen] = useState(false); // State to handle snackbar visibility
+  const [snackbarMessage, setSnackbarMessage] = useState(""); // Snackbar message
+  const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success"); // Snackbar severity
+  const [loading, setLoading] = useState(false); // State for loading spinner
 
   // Handles submitting images and displaying the result
   const handleSubmit = async () => {
     const images = [osImageData, odImageData].filter(Boolean) as any; // Remove null values
     if (images.length === 0) {
-      alert("Please upload at least one image (OD or OS).");
+      setSnackbarMessage("Please upload at least one image (OD or OS).");
+      setSnackbarSeverity("error");
+      setSnackbarOpen(true);
       return;
     }
+
+    // Start loading
+    setLoading(true);
     try {
       const response = await submitImages(images); // Call the API
       setResultData(response.metadata.storage); // Set result to be displayed
-      alert("Images submitted successfully!");
+      setSnackbarMessage("Images submitted successfully!");
+      setSnackbarSeverity("success");
     } catch {
-      alert("Error submitting images.");
+      setSnackbarMessage("Error submitting images.");
+      setSnackbarSeverity("error");
+    } finally {
+      setSnackbarOpen(true); // Open the snackbar after the result
+      setLoading(false); // Stop loading
     }
+  };
+
+  // Handle closing the snackbar
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
   };
 
   return (
@@ -54,15 +73,32 @@ export default function HomePage() {
         </Grid>
       </Grid>
 
-      {/* Submit Button */}
+      {/* Submit Button with Loading Spinner */}
       <Box mt={4} textAlign="center">
-        <Button variant="contained" color="primary" onClick={handleSubmit}>
+        <Button variant="contained" color="primary" onClick={handleSubmit} disabled={loading}>
           Submit Images
         </Button>
+        {loading && (
+          <Box mt={2}>
+            <CircularProgress /> {/* Loading spinner */}
+          </Box>
+        )}
       </Box>
 
       {/* Display Results after submission */}
       {resultData && <DisplayResults resultData={resultData} />}
+
+      {/* Snackbar for Success and Error Notifications */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: "100%" }}>
+          {snackbarMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 }
