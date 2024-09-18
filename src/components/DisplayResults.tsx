@@ -89,7 +89,7 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
               onClick={() => handleImageClick(eyeData.lanet_dr.url)}
             />
             <Typography variant="body2">
-              Screening: {eyeData.lanet_dr.screening} | Probability: {(eyeData.lanet_dr.probability?.probability * 100).toFixed(2)}%
+              Screening: {eyeData.lanet_dr.screening} | Probability: {(eyeData.lanet_dr.screening) == "noDR" ?  (eyeData.lanet_dr.probability?.probability * 100).toFixed(2) : (eyeData.lanet_dr.probability?.prediction * 100).toFixed(2)}%
             </Typography>
           </>
         )}
@@ -104,6 +104,9 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
               style={{ width: "300px", height: "300px", objectFit: "cover", marginBottom: "16px", cursor: "pointer" }}
               onClick={() => handleImageClick(eyeData.lessions.url)}
             />
+              <Typography variant="body2">
+              Count: SE: {eyeData.lessions.lesions?.SE?.count} | HE: {eyeData.lessions.lesions?.HE?.count} | MA: {eyeData.lessions.lesions?.MA?.count} | EX: {eyeData.lessions.lesions?.EX?.count} 
+            </Typography>
           </>
         )}
 
