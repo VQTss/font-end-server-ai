@@ -1,18 +1,19 @@
-export const submitToGoogleSheets = async (data: { OD: string; OS: string; comments: string }) => {
-    const googleSheetsUrl = "https://script.google.com/macros/s/AKfycbyIluVg7jae8cKaqZR3Rd6sqkFf_HaUKxYtLXafse4/exec"; // Replace with your Google Sheets Web App URL
+export const submitToGoogleSheets = async (data: any) => {
+  const googleSheetsUrl = "https://script.google.com/macros/s/AKfycbwkRGLBC1sWdae58LNUDLzNI2075YdOekxjx53Gar_bzoMu0e47mdIY53EnNTvueR8d/exec"; // Replace with your actual URL
   
+  try {
     const response = await fetch(googleSheetsUrl, {
       method: "POST",
+      mode: "no-cors",
       headers: {
         "Content-Type": "application/json",
+        
       },
       body: JSON.stringify(data),
     });
-  
-    if (!response.ok) {
-      throw new Error("Failed to submit confirmation");
-    }
-  
-    return response.json();
-  };
-  
+    return  response;
+  } catch (error) {
+    console.error("Error submitting to Google Sheets: ", error);
+    throw error;
+  }
+};

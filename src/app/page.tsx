@@ -9,14 +9,15 @@ import { submitImages } from "../services/imageService";
 export default function HomePage() {
   const { osImageData, odImageData, handleImageUpload, removeImage } = useImageUpload();
   const [resultData, setResultData] = useState<any>(null); // Store the result data
-  const [snackbarOpen, setSnackbarOpen] = useState(false); // State to handle snackbar visibility
+  const [snackbarOpen, setSnackbarOpen] = useState(false); // Snackbar visibility
   const [snackbarMessage, setSnackbarMessage] = useState(""); // Snackbar message
   const [snackbarSeverity, setSnackbarSeverity] = useState<"success" | "error">("success"); // Snackbar severity
   const [loading, setLoading] = useState(false); // State for loading spinner
-
-  // Handles submitting images and displaying the result
+  const [patientID, setPatientID] = useState(0);
+  const [episodeRecordID, setEpisodeRecordID] = useState(0);
+  // Handle image submission and display result
   const handleSubmit = async () => {
-    const images = [osImageData, odImageData].filter(Boolean) as any; // Remove null values
+    const images = [osImageData, odImageData].filter(Boolean) as any; // Filter null values
     if (images.length === 0) {
       setSnackbarMessage("Please upload at least one image (OD or OS).");
       setSnackbarSeverity("error");
@@ -24,25 +25,22 @@ export default function HomePage() {
       return;
     }
 
-    // Start loading
-    setLoading(true);
+    setLoading(true); // Start loading
     try {
-      const response = await submitImages(images); // Call the API
-      setResultData(response.metadata.storage); // Set result to be displayed
+      const { data, patientID, esposideID } = await submitImages(images); // Call API
+      // Set the returned data, patientID, and episodeRecordID to the state
+      setResultData(data);
+      setPatientID(patientID);
+      setEpisodeRecordID(esposideID);
       setSnackbarMessage("Images submitted successfully!");
       setSnackbarSeverity("success");
     } catch {
       setSnackbarMessage("Error submitting images.");
       setSnackbarSeverity("error");
     } finally {
-      setSnackbarOpen(true); // Open the snackbar after the result
+      setSnackbarOpen(true); // Open snackbar after result
       setLoading(false); // Stop loading
     }
-  };
-
-  // Handle closing the snackbar
-  const handleCloseSnackbar = () => {
-    setSnackbarOpen(false);
   };
 
   return (
@@ -86,16 +84,22 @@ export default function HomePage() {
       </Box>
 
       {/* Display Results after submission */}
-      {resultData && <DisplayResults resultData={resultData} />}
+      {resultData && (
+        <DisplayResults
+          resultData={resultData.metadata.storage}
+          patientID={patientID}
+          episodeRecordID={episodeRecordID}
+        />
+      )}
 
       {/* Snackbar for Success and Error Notifications */}
       <Snackbar
         open={snackbarOpen}
         autoHideDuration={3000}
-        onClose={handleCloseSnackbar}
+        onClose={() => setSnackbarOpen(false)}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       >
-        <Alert onClose={handleCloseSnackbar} severity={snackbarSeverity} sx={{ width: "100%" }}>
+        <Alert onClose={() => setSnackbarOpen(false)} severity={snackbarSeverity} sx={{ width: "100%" }}>
           {snackbarMessage}
         </Alert>
       </Snackbar>

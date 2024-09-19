@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Box, Card, CardContent, Typography, Grid, Divider, Dialog, Button, RadioGroup, FormControlLabel, Radio, DialogTitle, DialogContent, DialogActions, TextField } from "@mui/material";
+import { submitToGoogleSheets } from '../services/googleSheetsService'; // Ensure the correct path
 
 // Component to display individual eye data (OD or OS)
 const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string }) => {
@@ -87,7 +88,7 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
               onClick={() => handleImageClick(eyeData.lanet_dr.url)}
             />
             <Typography variant="body2">
-              Screening: {eyeData.lanet_dr.screening} | Probability: {(eyeData.lanet_dr.screening === "noDR") ?  (eyeData.lanet_dr.probability?.probability * 100).toFixed(2) : (eyeData.lanet_dr.probability?.prediction * 100).toFixed(2)}%
+              Screening: {eyeData.lanet_dr.screening} | Probability: {(eyeData.lanet_dr.screening === "noDR") ? (eyeData.lanet_dr.probability?.probability * 100).toFixed(2) : (eyeData.lanet_dr.probability?.prediction * 100).toFixed(2)}%
             </Typography>
           </>
         )}
@@ -102,8 +103,8 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
               style={{ width: "300px", height: "300px", objectFit: "cover", marginBottom: "16px", cursor: "pointer" }}
               onClick={() => handleImageClick(eyeData.lessions.url)}
             />
-              <Typography variant="body2">
-              Count: SE: {eyeData.lessions.lesions?.SE?.count} | HE: {eyeData.lessions.lesions?.HE?.count} | MA: {eyeData.lessions.lesions?.MA?.count} | EX: {eyeData.lessions.lesions?.EX?.count} 
+            <Typography variant="body2">
+              Count: SE: {eyeData.lessions.lesions?.SE?.count} | HE: {eyeData.lessions.lesions?.HE?.count} | MA: {eyeData.lessions.lesions?.MA?.count} | EX: {eyeData.lessions.lesions?.EX?.count}
             </Typography>
           </>
         )}
@@ -141,16 +142,6 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
           </>
         )}
 
-        {/* Glaucoma Section */}
-        {eyeData.glaucoma?.predict && (
-          <>
-            <Typography variant="subtitle1" fontWeight="bold">Glaucoma Prediction:</Typography>
-            <Typography variant="body2">
-              Predict: {eyeData.glaucoma.predict} | Probability: {eyeData.glaucoma.probability?.toFixed(2)}%
-            </Typography>
-          </>
-        )}
-
         {/* Segmentation Section */}
         {eyeData.segmentationOD?.url && (
           <>
@@ -170,6 +161,30 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
           </>
         )}
 
+
+        {/* Glaucoma Section */}
+        {eyeData.glaucoma?.predict && (
+          <>
+            <Typography variant="subtitle1" fontWeight="bold">Glaucoma Prediction:</Typography>
+            <Typography variant="body2">
+              Predict: {eyeData.glaucoma.predict} | Probability: {eyeData.glaucoma.probability?.toFixed(2)}%
+            </Typography>
+          </>
+        )}
+
+        {/* analysis optic disc section */}
+        {eyeData.analysisOD.analysis?.ISNT && (
+          <>
+            <Typography variant="subtitle1" fontWeight="bold">ISNT</Typography>
+            <Typography variant="body2">I: {eyeData.analysisOD.analysis?.ISNT?.I} S: {eyeData.analysisOD.analysis?.ISNT?.S} N: {eyeData.analysisOD.analysis?.ISNT?.N} T: {eyeData.analysisOD.analysis?.ISNT?.T}</Typography>
+            <Typography variant="body2">Result: {eyeData.analysisOD.analysis?.final_results}</Typography>
+          </>
+        )}
+
+
+
+
+
         {/* Modal for Zoom-Out */}
         <Dialog open={open} onClose={handleClose} maxWidth="md">
           {selectedImage && (
@@ -184,22 +199,17 @@ const DisplayEyeData = ({ eyeData, eyeType }: { eyeData: any, eyeType: string })
 // Helper to render radio button options
 const renderRadioOptions = () => {
   const options = [
-    // { value: 1, label: "1 - Strongly Disagree" },
-    // { value: 2, label: "2 - Disagree" },
-    // { value: 3, label: "3 - Neutral" },
-    // { value: 4, label: "4 - Agree" },
-    // { value: 5, label: "5 - Strongly Agree" }
-    { value: 1, label: "1" },
-    { value: 2, label: "2" },
-    { value: 3, label: "3" },
-    { value: 4, label: "4" },
-    { value: 5, label: "5" }
+    { value: 1, label: "1 - Strongly Disagree" },
+    { value: 2, label: "2 - Disagree" },
+    { value: 3, label: "3 - Neutral" },
+    { value: 4, label: "4 - Agree" },
+    { value: 5, label: "5 - Strongly Agree" }
   ];
 
   return options.map((option) => (
     <FormControlLabel
       key={option.value}
-      value={option.value}
+      value={option.value.toString()}
       control={<Radio />}
       label={option.label}
     />
@@ -209,6 +219,7 @@ const renderRadioOptions = () => {
 // Generate final conclusion
 const generateConclusion = (resultData: any) => {
   let conclusion = "";
+  console.log("resultData", resultData);
 
   resultData.forEach((eyeDataObj: any) => {
     if (eyeDataObj.OD && Object.keys(eyeDataObj.OD).length > 0) {
@@ -242,13 +253,20 @@ const generateConclusion = (resultData: any) => {
 };
 
 // Component to Display Either OD or OS or Both
-const DisplayResults = ({ resultData }: { resultData: any }) => {
-  const [formData, setFormData] = useState<any>({
+const DisplayResults = ({ resultData, patientID, episodeRecordID }: { resultData: any, patientID: number, episodeRecordID: number }) => {
+  const initialFormData = {
     OD: {},
     OS: {},
-    comments: ""
-  });
+    comments: "",
+    patientID: patientID,
+    episodeRecordID: episodeRecordID,
+    type: "",
+  };
+
+  const [formData, setFormData] = useState<any>(initialFormData);
   const [confirmOpen, setConfirmOpen] = useState(false); // Modal state
+  const [successDialogOpen, setSuccessDialogOpen] = useState(false); // Success Dialog State
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false); // Error Dialog State
 
   const handleRadioChange = (eye: "OD" | "OS", field: string, value: number) => {
     setFormData((prevData: any) => ({
@@ -256,8 +274,35 @@ const DisplayResults = ({ resultData }: { resultData: any }) => {
       [eye]: {
         ...prevData[eye],
         [field]: value
-      }
+      },
+      type: eye,
     }));
+  };
+
+  const handleSubmitConfirmation = async () => {
+    console.log("formData", formData);
+
+    const data = {
+      OD: formData.OD,
+      OS: formData.OS,
+      comments: formData.comments,
+      patientID: formData.patientID,
+      episodeRecordID: formData.episodeRecordID,
+      type: formData.type,
+    };
+
+    try {
+      await submitToGoogleSheets(data);
+      console.log("data submitted", data);
+
+      // Open Success Dialog and Reset Form Data
+      setSuccessDialogOpen(true);
+      setFormData(initialFormData);  // Clear all form data
+      setConfirmOpen(false);
+    } catch (error) {
+      console.error("Error submitting confirmation", error);
+      setErrorDialogOpen(true);
+    }
   };
 
   const handleOpenConfirm = () => {
@@ -312,37 +357,41 @@ const DisplayResults = ({ resultData }: { resultData: any }) => {
             <>
               <Typography variant="h6" gutterBottom>Right Eye (OD) Confirmations</Typography>
               <Typography variant="subtitle1"><strong>Glaucoma</strong></Typography>
-              <RadioGroup row value={formData.OD.glaucoma} onChange={(e) => handleRadioChange('OD', 'glaucoma', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.glaucoma?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'glaucoma', parseInt(e.target.value))}>
+                {renderRadioOptions()}
+              </RadioGroup>
+              <Typography variant="subtitle1"><strong>ISNT</strong></Typography>
+              <RadioGroup row value={formData.OD.ISNT?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'ISNT', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>DR Screening</strong></Typography>
-              <RadioGroup row value={formData.OD.drScreening} onChange={(e) => handleRadioChange('OD', 'drScreening', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.drScreening?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'drScreening', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>AMD</strong></Typography>
-              <RadioGroup row value={formData.OD.amd} onChange={(e) => handleRadioChange('OD', 'amd', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.amd?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'amd', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>Lesion Detection</strong></Typography>
               <Typography variant="body2">1. Accuracy of Lesion Location</Typography>
-              <RadioGroup row value={formData.OD.lesionDetectionLocation} onChange={(e) => handleRadioChange('OD', 'lesionDetectionLocation', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.lesionDetectionLocation?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'lesionDetectionLocation', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
               <Typography variant="body2">2. Accuracy of Lesion Type</Typography>
-              <RadioGroup row value={formData.OD.lesionDetectionType} onChange={(e) => handleRadioChange('OD', 'lesionDetectionType', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.lesionDetectionType?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'lesionDetectionType', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>Segmentation</strong></Typography>
               <Typography variant="body2">1. Accuracy of Segmentation Location</Typography>
-              <RadioGroup row value={formData.OD.segmentationLocation} onChange={(e) => handleRadioChange('OD', 'segmentationLocation', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.segmentationLocation?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'segmentationLocation', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
               <Typography variant="body2">2. Accuracy of Segmentation Type</Typography>
-              <RadioGroup row value={formData.OD.segmentationType} onChange={(e) => handleRadioChange('OD', 'segmentationType', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OD.segmentationType?.toString() || ""} onChange={(e) => handleRadioChange('OD', 'segmentationType', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
             </>
@@ -354,37 +403,42 @@ const DisplayResults = ({ resultData }: { resultData: any }) => {
               <Typography variant="h6" gutterBottom>Left Eye (OS) Confirmations</Typography>
 
               <Typography variant="subtitle1"><strong>Glaucoma</strong></Typography>
-              <RadioGroup row value={formData.OS.glaucoma} onChange={(e) => handleRadioChange('OS', 'glaucoma', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.glaucoma?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'glaucoma', parseInt(e.target.value))}>
+                {renderRadioOptions()}
+              </RadioGroup>
+
+              <Typography variant="subtitle1"><strong>ISNT</strong></Typography>
+              <RadioGroup row value={formData.OS.ISNT?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'ISNT', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>DR Screening</strong></Typography>
-              <RadioGroup row value={formData.OS.drScreening} onChange={(e) => handleRadioChange('OS', 'drScreening', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.drScreening?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'drScreening', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>AMD</strong></Typography>
-              <RadioGroup row value={formData.OS.amd} onChange={(e) => handleRadioChange('OS', 'amd', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.amd?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'amd', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>Lesion Detection</strong></Typography>
               <Typography variant="body2">1. Accuracy of Lesion Location</Typography>
-              <RadioGroup row value={formData.OS.lesionDetectionLocation} onChange={(e) => handleRadioChange('OS', 'lesionDetectionLocation', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.lesionDetectionLocation?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'lesionDetectionLocation', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
               <Typography variant="body2">2. Accuracy of Lesion Type</Typography>
-              <RadioGroup row value={formData.OS.lesionDetectionType} onChange={(e) => handleRadioChange('OS', 'lesionDetectionType', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.lesionDetectionType?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'lesionDetectionType', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
 
               <Typography variant="subtitle1"><strong>Segmentation</strong></Typography>
               <Typography variant="body2">1. Accuracy of Segmentation Location</Typography>
-              <RadioGroup row value={formData.OS.segmentationLocation} onChange={(e) => handleRadioChange('OS', 'segmentationLocation', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.segmentationLocation?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'segmentationLocation', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
               <Typography variant="body2">2. Accuracy of Segmentation Type</Typography>
-              <RadioGroup row value={formData.OS.segmentationType} onChange={(e) => handleRadioChange('OS', 'segmentationType', parseInt(e.target.value))}>
+              <RadioGroup row value={formData.OS.segmentationType?.toString() || ""} onChange={(e) => handleRadioChange('OS', 'segmentationType', parseInt(e.target.value))}>
                 {renderRadioOptions()}
               </RadioGroup>
             </>
@@ -397,13 +451,39 @@ const DisplayResults = ({ resultData }: { resultData: any }) => {
             multiline
             rows={3}
             value={formData.comments}
-            onChange={(e) => setFormData((prevData:any) => ({ ...prevData, comments: e.target.value }))}
+            onChange={(e) => setFormData((prevData: any) => ({ ...prevData, comments: e.target.value }))}
             sx={{ mt: 2 }}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseConfirm} color="primary" variant="contained">
+          <Button onClick={handleSubmitConfirmation} color="primary" variant="contained">
             Submit Confirmation
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Success Dialog */}
+      <Dialog open={successDialogOpen} onClose={() => setSuccessDialogOpen(false)}>
+        <DialogTitle>Success</DialogTitle>
+        <DialogContent>
+          <Typography>Confirmation submitted successfully.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSuccessDialogOpen(false)} color="primary">
+            OK
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Error Dialog */}
+      <Dialog open={errorDialogOpen} onClose={() => setErrorDialogOpen(false)}>
+        <DialogTitle>Error</DialogTitle>
+        <DialogContent>
+          <Typography>Failed to submit confirmation. Please try again.</Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setErrorDialogOpen(false)} color="primary">
+            OK
           </Button>
         </DialogActions>
       </Dialog>
